@@ -19,8 +19,7 @@ def main() -> None:
             # print the search query here
             print("Searching for:", args.query)
             results = search_command(args.query)
-            for i, res in enumerate(results, 1):
-                print(f"{i}. {res['title']}")
+            print(results)
         case "build":
             print("Building inverted index...")
             build_command()
