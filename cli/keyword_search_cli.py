@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
-import string
 
+from lib.keyword_search import search_command
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -13,28 +12,14 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Search query")
 
     args = parser.parse_args()
-
-    fm = open("data/movies.json", "r")
-    movies = json.load(fm)
-
-    puncDic = {}
-    for punc in string.punctuation:
-        puncDic[punc] = None
-    puncTrans = str.maketrans(puncDic)
-
+    
     match args.command:
         case "search":
-            results = []
             # print the search query here
             print("Searching for:", args.query)
-            for movie in movies["movies"]:
-                if args.query.lower().translate(puncTrans) in movie["title"].lower().translate(puncTrans):
-                    results.append(movie["title"])
-            index = 1
-            for result in results[:5]:
-                print(str(index) + "." + result)
-                index += 1
-
+            results = search_command(args.query)
+            for i, res in enumerate(results, 1):
+                print(f"{i}. {res['title']}")
         case _:
             parser.print_help()
 
