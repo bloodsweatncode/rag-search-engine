@@ -10,4 +10,8 @@ wheels/
 .venv
 
 # Data 
-data
+data/
+
+uv.lock
+
+cache/
