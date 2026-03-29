@@ -5,9 +5,12 @@ import math
 
 from .search_utils import (
     CACHE_DIR,
-    DEFAULT_SEARCH_LIMIT, 
+    DEFAULT_SEARCH_LIMIT,
+    BM25_K1,
+    BM25_B, 
     load_movies, 
-    load_stopwords
+    load_stopwords,
+    format_search_result,
 )
 
 from nltk.stem import PorterStemmer
@@ -20,17 +23,25 @@ class InvertedIndex:
     def __init__(self):
         self.index = defaultdict(set)
         self.docmap = {}
+        self.doc_lengths = {}
         self.term_frequencies = defaultdict(Counter)
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
         self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
-
     
     def __add_document(self, doc_id, text):
         tokens = tokenize_text(text)
         for token in tokens:
             self.index[token].add(doc_id)
         self.term_frequencies[doc_id].update(tokens)
+        self.doc_lengths[doc_id] = len(tokens)
+
+    def __get_avg_doc_length(self) -> float:
+        sum = 0.0
+        for lenght in self.doc_lengths.values():
+            sum += lenght
+        return sum / len(self.doc_lengths)        
 
     def get_documents(self, term):
         return sorted(self.index.get(term, set()))
@@ -47,6 +58,8 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
+        with open(self.doc_lengths_path, "wb") as f:
+            pickle.dump(self.doc_lengths, f)
         with open(self.term_frequencies_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
 
@@ -55,12 +68,52 @@ class InvertedIndex:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
+        with open(self.doc_lengths_path, "rb") as f:
+            self.doc_lengths = pickle.load(f)
         with open(self.term_frequencies_path, "rb") as f:
             self.term_frequencies = pickle.load(f)
 
     def get_tf(self, doc_id, term):
-        tokenized_term = tokenize_text (term)
+        tokenized_term = tokenize_text(term)
         return self.term_frequencies[doc_id][term]
+    
+    def get_bm25_idf(self, term: str) -> float:
+        N = len(self.docmap)
+        df = len(self.get_documents(term))
+        return math.log((N - df +0.5) / (df + 0.5) + 1)
+    
+    def get_bm25_tf(self, doc_id, term, k1=BM25_K1, b=BM25_B) -> float:
+        tf = self.get_tf(doc_id, term)
+        lenth_norm = 1 - b + b * (self.doc_lengths[doc_id] / self.__get_avg_doc_length())
+        return (tf * (k1 + 1)) / (tf + k1 * lenth_norm)
+    
+    def bm25(self, doc_id, term) -> float:
+        return self.get_bm25_tf(doc_id, term) * self.get_bm25_idf(term)
+    
+    def bm25_search(self, query, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+        tokenized_query = tokenize_text(query)
+        scores = {}
+        
+        for doc_id in self.docmap:
+            score = 0.0
+            for token in tokenized_query:
+                score += self.bm25(doc_id, token)
+            scores[doc_id]=score
+        
+        sorted_docs = sorted(scores.items(), key = lambda item: item[1], reverse=True)
+        
+        results = []
+        for doc_id, score in sorted_docs[:limit]:
+            doc = self.docmap[doc_id]
+            formatted_result = format_search_result(
+                doc_id = doc["id"],
+                title = doc["title"],
+                document = doc["description"],
+                score = score,
+            )
+            results.append(formatted_result)
+        return results
+        
 
 
 def build_command() -> None:
@@ -104,6 +157,26 @@ def idf_command(term: str) -> float:
 def tfidf_command(doc_id: int, term: str) -> float:
     return tf_command(doc_id, term) * idf_command(term)
 
+
+def bm25_idf_command(term: str) -> float:
+    idx = InvertedIndex()
+    idx.load()
+    docs = search_command()
+    return idx.get_bm25_idf(term)
+
+
+def bm25_tf_command(doc_id: int, term: str, k1 = BM25_K1, b = BM25_B):
+    idx = InvertedIndex()
+    idx.load()
+    token = tokenize_text(term)
+    return idx.get_bm25_tf(doc_id, term, k1, b)
+
+
+def bm25search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    idx = InvertedIndex()
+    idx.load()
+    return idx.bm25_search(query, limit)
+    
 
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
     for query_token in query_tokens:
