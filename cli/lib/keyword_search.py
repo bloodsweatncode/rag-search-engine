@@ -1,6 +1,7 @@
 import os
 import string
 import pickle
+import math
 
 from .search_utils import (
     CACHE_DIR,
@@ -11,7 +12,7 @@ from .search_utils import (
 
 from nltk.stem import PorterStemmer
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 
 class InvertedIndex:
@@ -19,14 +20,17 @@ class InvertedIndex:
     def __init__(self):
         self.index = defaultdict(set)
         self.docmap = {}
+        self.term_frequencies = defaultdict(Counter)
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
 
     
     def __add_document(self, doc_id, text):
-        tokenized_text = tokenize_text(text)
-        for token in tokenized_text:
+        tokens = tokenize_text(text)
+        for token in tokens:
             self.index[token].add(doc_id)
+        self.term_frequencies[doc_id].update(tokens)
 
     def get_documents(self, term):
         return sorted(self.index.get(term, set()))
@@ -43,12 +47,20 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
+        with open(self.term_frequencies_path, "wb") as f:
+            pickle.dump(self.term_frequencies, f)
 
     def load(self):
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
+        with open(self.term_frequencies_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
+
+    def get_tf(self, doc_id, term):
+        tokenized_term = tokenize_text (term)
+        return self.term_frequencies[doc_id][term]
 
 
 def build_command() -> None:
@@ -72,6 +84,25 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
             if len(results) >= limit:
                 return results
     return results
+
+
+def tf_command(doc_id: int, term: str) -> int:
+    idx = InvertedIndex()
+    idx.load()
+    return idx.get_tf(doc_id, term)
+
+
+def idf_command(term: str) -> float:
+    idx = InvertedIndex()
+    idx.load()
+    token = tokenize_text(term)
+    total_doc_count = len(idx.docmap)
+    term_match_doc_count = len(idx.get_documents(token[0]))
+    return math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+
+
+def tfidf_command(doc_id: int, term: str) -> float:
+    return tf_command(doc_id, term) * idf_command(term)
 
 
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:

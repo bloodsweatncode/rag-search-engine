@@ -2,7 +2,13 @@
 
 import argparse
 
-from lib.keyword_search import build_command, search_command 
+from lib.keyword_search import (
+    build_command, 
+    search_command, 
+    tf_command, 
+    idf_command,
+    tfidf_command,
+)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -10,7 +16,19 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
     search_parser.add_argument("query", type=str, help="Search query")
+
     search_parser = subparsers.add_parser("build", help="Build inverted Index and save it")
+
+    search_parser = subparsers.add_parser("tf", help="Get term frequency for a given document ID and term")
+    search_parser.add_argument("doc_id", type=int, help="Document ID")
+    search_parser.add_argument("term", type=str, help="Term to get frequency for")
+
+    search_parser = subparsers.add_parser("idf", help="Get term frequency for a given document ID and term")
+    search_parser.add_argument("term", type=str, help="Term to get frequency for")
+
+    search_parser = subparsers.add_parser("tfidf", help="Get term frequency for a given document ID and term")
+    search_parser.add_argument("doc_id", type=int, help="Document ID")
+    search_parser.add_argument("term", type=str, help="Term to get frequency for")
 
     args = parser.parse_args()
     
@@ -25,6 +43,15 @@ def main() -> None:
             print("Building inverted index...")
             build_command()
             print("Inverted index built successfully.")
+        case "tf":
+            tf = tf_command(args.doc_id, args.term)
+            print(f"Term frequency of '{args.term}' in document '{args.doc_id}': {tf}")
+        case "idf":
+            idf = idf_command(args.term)
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
+        case "tfidf":
+            tf_idf = tfidf_command(args.doc_id, args.term)
+            print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
         case _:
             parser.print_help()
 
