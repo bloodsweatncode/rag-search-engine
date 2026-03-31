@@ -7,7 +7,10 @@ from lib.semantic_search import (
         embed_text,
         verify_embeddings,
         embed_query_text,
+        SemanticSearch,
 )
+
+from lib.search_utils import load_movies
 
 def main():
     parser = argparse.ArgumentParser(description="Semantic Search CLI")
@@ -23,6 +26,10 @@ def main():
     embedquery_parser = subparsers.add_parser("embedquery")
     embedquery_parser.add_argument("query", type=str)
 
+    search_parser = subparsers.add_parser("search", help="Search for movies using semantic search")
+    search_parser.add_argument("query", type=str, help="Search query")
+    search_parser.add_argument("--limit", type=int, default=5,  help="Number of results to return")
+
     args = parser.parse_args()
 
     match args.command:
@@ -34,6 +41,14 @@ def main():
             verify_embeddings()
         case "embedquery":
             embed_query_text(args.query)
+        case "search":
+            ses = SemanticSearch()
+            movies = load_movies()
+            ses.load_or_create_embeddings(movies)
+            search_results = ses.search(args.query, args.limit)
+            for i, search_result in enumerate(search_results, 1):
+                print(f"{i}. {search_result['title']} (score: {search_result['score']:.4f})") 
+                print(f"{search_result['description'][:100]}...\n")
         case _:
             parser.print_help()
 
