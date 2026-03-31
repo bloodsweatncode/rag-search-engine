@@ -4,6 +4,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from .search_utils import (
+    DEFAULT_SEARCH_LIMIT,
+    DEFAULT_CHUNK_SIZE,
     CACHE_DIR,
     load_movies,
 )
@@ -69,9 +71,6 @@ class SemanticSearch:
         return results
 
 
-        
-
-
 def verify_model():
     ses = SemanticSearch()
     print(f"Model loaded: {ses.model}")
@@ -111,3 +110,34 @@ def cosine_similarity(vec1, vec2):
         return 0.0
 
     return dot_product / (norm1 * norm2)
+
+
+def semantic_search(query, limit=DEFAULT_SEARCH_LIMIT):
+    ses = SemanticSearch()
+    movies = load_movies()
+    ses.load_or_create_embeddings(movies)
+    search_results = ses.search(query, limit)
+    for i, search_result in enumerate(search_results, 1):
+        print(f"{i}. {search_result['title']} (score: {search_result['score']:.4f})") 
+        print(f"{search_result['description'][:100]}...\n")
+
+
+def fixed_size_chunking(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> list[str]:
+    words = text.split()
+    chunks = []
+
+    n_words = len(words)
+    i = 0
+    while i < n_words:
+        chunk_words = words[i: i + chunk_size]
+        chunks.append(" ".join(chunk_words))
+        i += chunk_size
+    
+    return chunks
+
+
+def chunk_text(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> None: 
+    chunks = fixed_size_chunking(text, chunk_size)
+    print(f"Chunking {len(text)} characters")
+    for i, chunk in enumerate(chunks):
+        print(f"{i + 1}. {chunk}")
