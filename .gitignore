@@ -17,3 +17,5 @@ uv.lock
 cache/
 
 .env
+
+amdgpu-install_7.2.1.70201-1_all.deb

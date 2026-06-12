@@ -136,8 +136,13 @@ def fixed_size_chunking(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> list
     return chunks
 
 
-def chunk_text(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> None: 
+def chunk_text(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE, overlap: int = 0) -> None: 
     chunks = fixed_size_chunking(text, chunk_size)
+    if overlap > 0 and len(chunks) > 1:
+        for i in range(len(chunks)):
+            chunks[i].join(chunks[i-1][-overlap:])
+
     print(f"Chunking {len(text)} characters")
     for i, chunk in enumerate(chunks):
         print(f"{i + 1}. {chunk}")
+        
